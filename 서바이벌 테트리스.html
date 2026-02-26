@@ -250,7 +250,7 @@
           <div class="mode-title">TETRIS (TAB)</div>
           <ul>
             <li><span class="key">← →</span> Move / <span class="key">↑</span> Rot</li>
-            <li><span class="key">Space</span> Drop</li>
+            <li><span class="key">↓</span> Soft / <span class="key">Space</span> Hard Drop</li>
           </ul>
           <div class="mode-title">SURVIVAL (TAB)</div>
           <ul>
@@ -264,6 +264,24 @@
             <div style="font-size: 9px; margin-bottom: 3px; opacity: 0.6">NEXT</div>
             <canvas id="next-canvas" width="60" height="60"></canvas>
             <div id="score-display" style="margin-top: 5px; font-size: 11px; font-weight: bold; color: #4dff88">0</div>
+          </div>
+          <!-- 레벨(속도) 표시 UI 추가 -->
+          <div
+            id="level-display"
+            style="
+              margin-top: 8px;
+              font-size: 14px;
+              font-weight: bold;
+              color: #ffeb3b;
+              text-align: center;
+              background: rgba(0, 0, 0, 0.7);
+              border: 1px solid #555;
+              padding: 5px;
+              width: 100px;
+              box-sizing: border-box;
+            "
+          >
+            LV. 1
           </div>
         </div>
       </div>
@@ -317,6 +335,7 @@
           <li>
             <span style="color: #fff; font-weight: bold">← →</span> 이동 &nbsp;|&nbsp;
             <span style="color: #fff; font-weight: bold">↑</span> 회전 &nbsp;|&nbsp;
+            <span style="color: #fff; font-weight: bold">↓</span> 가속 &nbsp;|&nbsp;
             <span style="color: #fff; font-weight: bold">Space</span> 낙하
           </li>
           <li style="margin-top: 8px; color: #aaa">🏃 <strong>서바이벌 모드 (1인칭)</strong></li>
@@ -401,6 +420,8 @@
       let dropInterval = 1000;
       let lastTimeDelta = 0;
       let lastTime = 0;
+      let elapsedTime = 0; // 게임 경과 시간
+      let currentLevel = 1; // 현재 속도 레벨
 
       let playerSprite;
       let textureIdle;
@@ -1011,6 +1032,7 @@
         if (gameMode === 'TETRIS' && activePiece) {
           if (e.code === 'ArrowLeft') movePiece(-1, 0);
           if (e.code === 'ArrowRight') movePiece(1, 0);
+          if (e.code === 'ArrowDown') e.preventDefault(); // 스크롤 방지
           if (e.code === 'ArrowUp') rotatePiece();
           if (e.code === 'Space') {
             e.preventDefault();
@@ -1070,7 +1092,23 @@
         const dt = Math.min((time - lastTime) / 1000, 0.1);
         lastTime = time;
 
-        if (activePiece && time - lastTimeDelta > dropInterval) {
+        // 시간에 따른 레벨업 및 속도 증가 로직
+        elapsedTime += dt;
+        const newLevel = Math.floor(elapsedTime / 20) + 1; // 20초마다 1레벨씩 상승
+        if (newLevel > currentLevel) {
+          currentLevel = newLevel;
+          // 레벨당 떨어지는 간격을 80ms씩 줄여 속도를 높임 (최소 간격 150ms 제한)
+          dropInterval = Math.max(150, 1000 - (currentLevel - 1) * 80);
+          document.getElementById('level-display').innerText = 'LV. ' + currentLevel;
+        }
+
+        // 소프트 드랍 로직 (아래 방향키를 누르고 있으면 빠르게 낙하)
+        let currentDropInterval = dropInterval;
+        if (gameMode === 'TETRIS' && keys['ArrowDown']) {
+          currentDropInterval = 50; // 가속 속도 (50ms)
+        }
+
+        if (activePiece && time - lastTimeDelta > currentDropInterval) {
           if (!movePiece(0, -1)) lockPiece();
           lastTimeDelta = time;
         }
@@ -1083,6 +1121,13 @@
       function startGame() {
         document.getElementById('main-menu').style.display = 'none';
         bgm.play().catch((e) => console.warn('오디오 재생 실패:', e));
+
+        // 게임 시작 시 초기화
+        elapsedTime = 0;
+        currentLevel = 1;
+        dropInterval = 1000;
+        document.getElementById('level-display').innerText = 'LV. 1';
+
         init();
         animate();
       }
